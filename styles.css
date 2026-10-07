@@ -164,3 +164,7 @@ main{padding:28px var(--gut) 90px;max-width:1400px;margin:0 auto}
 .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .circle .disc{font-size:22px;font-weight:800;letter-spacing:.04em}
 .sheet .close{width:auto;padding:0 18px;font-size:15px;font-weight:700;border-radius:999px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 22px}
+.bar .seg{margin:0}
+.scan-mini{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:13px;font-weight:600}
+.scan-mini:active{background:var(--pill)}

@@ -171,7 +171,7 @@ function footer() {
   const checked = SOURCES.map(s => s.lastChecked).filter(Boolean).sort().pop();
   return `<div class="fade" style="margin-top:50px;color:var(--ink2);font-size:14px;text-align:center">Every opportunity links to its original source. Sources last checked ${checked ? ago(checked) : '-'} - <button data-sources style="color:var(--accent);font-weight:600;font-size:14px">See sources</button></div>`;
 }
-const fmtBar = () => `<div class="seg" role="group" aria-label="Format">${['All', 'Virtual', 'In person'].map(v => `<button class="${fmtF === v ? 'on' : ''}" data-fmt="${v}">${v.toUpperCase()}</button>`).join('')}</div><div class="fgroup" style="margin:-6px 0 22px"><small>LOCATION</small><div class="chips">${LOCS.map(v => `<button class="chip ${locF === v ? 'on' : ''}" data-loc="${v}">${v}</button>`).join('')}</div></div>`;
+const fmtBar = () => `<div class="bar"><div class="seg" role="group" aria-label="Format">${['All', 'Virtual', 'In person'].map(v => `<button class="${fmtF === v ? 'on' : ''}" data-fmt="${v}">${v.toUpperCase()}</button>`).join('')}</div>${scanBlock()}</div><div class="fgroup" style="margin:-6px 0 22px"><small>LOCATION</small><div class="chips">${LOCS.map(v => `<button class="chip ${locF === v ? 'on' : ''}" data-loc="${v}">${v}</button>`).join('')}</div></div>`;
 const groupsOf = o => {
   const g = [], d = o.discipline || [];
   if (d.includes('Film')) g.push('Film');
@@ -184,9 +184,9 @@ const groupsOf = o => {
 };
 function scanBlock() {
   const last = SCANS.find(x => x.status === 'complete'), pend = SCANS.find(x => x.status === 'requested' || x.status === 'running');
-  return `<button class="scan-btn" data-scan><span>SCAN FOR OPPORTUNITIES</span><small>${pend ? 'Scan requested ' + ago(pend.requestedAt) : last ? 'Last scan ' + ago(last.completedAt) + ' - ' + last.newCount + ' new - ' + last.updatedCount + ' updated' : 'No scan yet'}</small></button>`;
+  const tip = pend ? 'Scan requested ' + ago(pend.requestedAt) : last ? 'Last scan ' + ago(last.completedAt) + ': ' + last.newCount + ' new, ' + last.updatedCount + ' updated' : 'No scan yet';
+  return `<button class="scan-mini" data-scan title="${esc(tip)}">${pend ? 'Scan requested' : 'Scan for opportunities'}</button>`;
 }
-
 function render() {
   TODAY = todayStr();
   tabsEl.innerHTML = SECTIONS.map(s => `<button class="tab ${s === tab ? 'on' : ''}" data-tab="${s}">${s}</button>`).join('') +
@@ -198,10 +198,10 @@ function render() {
   const noneMsg = fmtF === 'All' ? 'Nothing open right now from the sources Scout checks.' : 'Nothing ' + fmtF.toLowerCase() + ' right now. Try ALL.';
   if (tab === 'Today') {
     const top = strong(), feat = top[0];
-    if (!feat) { view.innerHTML = scanBlock() + fmtBar() + emptyBox('', 'No strong matches right now', noneMsg) + footer(); return; }
+    if (!feat) { view.innerHTML = fmtBar() + emptyBox('', 'No strong matches right now', noneMsg) + footer(); return; }
     const saved = st.saved.map(byId).filter(o => o && live(o) && fmtOK(o));
     const soon = top.filter(o => o.deadline && !st.taken[o.id] && o.id !== feat.id).sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 6);
-    view.innerHTML = scanBlock() + fmtBar() + `<div class="fade">${hero(feat)}</div>` +
+    view.innerHTML = fmtBar() + `<div class="fade">${hero(feat)}</div>` +
       section('Top Opportunities', 'Selected based on your goals and interests.', rail(top.slice(1, 9))) +
       section('Opportunities You Took', 'Opportunities you\'re planning to attend or participate in.', circles()) +
       (saved.length ? section('Saved', 'Come back to these before the deadline.', rail(saved)) : '') +
