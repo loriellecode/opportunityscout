@@ -16,7 +16,7 @@ const SHOW_MIN = 60; // Today surfaces only matches at or above this
 
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 let TODAY = todayStr();
-let OPPS = [], SOURCES = [], loaded = false, dbOK = true;
+let OPPS = [], SOURCES = [], loaded = false, dbOK = true, staticMode = false;
 let st = { saved: [], taken: {}, slate: [], dismissed: [] };
 let fmtF = 'All', locF = 'Anywhere', verbF = null, groupF = null, SCANS = [];
 const LOCS = ['Anywhere', 'Virtual', 'California', 'Los Angeles', 'New York', 'Louisiana', 'International', 'Other'];
@@ -34,7 +34,7 @@ async function boot() {
   render();
   try {
     const c = window.claude && await window.claude.use('db');
-    if (!c) { dbOK = false; loaded = true; return render(); }
+    if (!c) { await loadStatic(); return; }
     db = c;
     db.collection('opportunities').onSnapshot(s => { OPPS = s.docs.map(d => ({ ...d.data(), id: d.id })); loaded = true; refresh(); }, () => { dbOK = false; loaded = true; refresh(); });
     db.collection('scans').onSnapshot(s => { SCANS = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (b.requestedAt || '').localeCompare(a.requestedAt || '')); if (!sheet.hidden && sheet.dataset.kind === 'scan') showScan(); else if (tab === 'Today') refresh(); }, () => {});
@@ -43,7 +43,15 @@ async function boot() {
       const u = await window.claude.use('user'); const id = u && await u.id();
       if (id) { stRef = db.collection('data/users/' + id).doc('scout'); stRef.onSnapshot(s => { if (s.exists) { st = { saved: [], taken: {}, slate: [], dismissed: [], ...s.data() }; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} refresh(); } }, () => {}); }
     } catch (e) {}
-  } catch (e) { dbOK = false; loaded = true; render(); }
+  } catch (e) { await loadStatic(); }
+}
+// Public site mode: no database, so read the exported snapshot (data.json).
+async function loadStatic() {
+  try {
+    const r = await fetch('data.json', { cache: 'no-cache' }); const d = await r.json();
+    OPPS = d.opportunities || []; SOURCES = d.sources || []; SCANS = d.scans || []; staticMode = true; dbOK = true;
+  } catch (e) { dbOK = false; }
+  loaded = true; render();
 }
 function refresh() { if (!sheet.hidden) return; const y = scrollY; render(true); scrollTo(0, y); }
 
@@ -184,7 +192,7 @@ function render() {
   tabsEl.innerHTML = SECTIONS.map(s => `<button class="tab ${s === tab ? 'on' : ''}" data-tab="${s}">${s}</button>`).join('') +
     `<button class="icon-btn ${tab === 'Search' ? 'on' : ''}" data-tab="Search" aria-label="Search"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>`;
   if (!loaded) { view.innerHTML = emptyBox('', 'Loading opportunities...', 'Reading the latest verified listings.'); return; }
-  if (!dbOK) { view.innerHTML = emptyBox('', 'Opportunity data isn\'t available', 'Open this page signed in to claude.ai to load the verified opportunity database.'); return; }
+  if (!dbOK) { view.innerHTML = emptyBox('', 'Opportunity data isn\'t available', 'The opportunity data could not be loaded. Try again in a moment.'); return; }
   if (tab === 'Search') return renderSearch();
   if (tab === 'Get Involved') return renderInvolved();
   const noneMsg = fmtF === 'All' ? 'Nothing open right now from the sources Scout checks.' : 'Nothing ' + fmtF.toLowerCase() + ' right now. Try ALL.';
@@ -330,7 +338,7 @@ document.addEventListener('click', e => {
   if ((el = g('data-verb'))) { verbF = verbF === el.dataset.verb ? null : el.dataset.verb; render(); return; }
   if ((el = g('data-group'))) { groupF = groupF === el.dataset.group ? null : el.dataset.group; render(); return; }
   if (g('data-scan')) { showScan(); return; }
-  if (g('data-startscan')) { if (db) { const id = 'scan-' + Date.now(); db.collection('scans').doc(id).set({ status: 'requested', requestedAt: new Date().toISOString(), newCount: 0, updatedCount: 0, expiredCount: 0 }).then(() => toast('Scan requested'), () => toast('Couldn\'t send the request')); } return; }
+  if (g('data-startscan')) { if (staticMode) { toast('Scans run from Claude. Open the app in Claude to request one.'); return; } if (db) { const id = 'scan-' + Date.now(); db.collection('scans').doc(id).set({ status: 'requested', requestedAt: new Date().toISOString(), newCount: 0, updatedCount: 0, expiredCount: 0 }).then(() => toast('Scan requested'), () => toast('Couldn\'t send the request')); } return; }
   if ((el = g('data-dismiss'))) { const id = el.dataset.dismiss; if (!st.dismissed.includes(id)) st.dismissed.push(id); persist(); toast('Hidden from your feed'); closeSheet(); return; }
   if ((el = g('data-slate'))) { const id = el.dataset.slate; if (!st.slate.includes(id)) { st.slate.push(id); if (st.taken[id]) st.taken[id].status = 'Added to Slate'; const o = byId(id); try { localStorage.setItem('slate.inbox', JSON.stringify([...(JSON.parse(localStorage.getItem('slate.inbox') || '[]')), { id, title:o.title, date:o.startsOn, deadline:o.deadline, time:o.timeText, location:o.location, url:o.url }])); } catch (er) {} toast('Added to Slate'); } persist(); refreshDetail(); return; }
   if ((el = g('data-status'))) { st.taken[sheet.dataset.id].status = el.dataset.status; persist(); refreshDetail(); return; }
